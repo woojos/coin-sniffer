@@ -1,4 +1,4 @@
-// Headless game core: owns every game rule and never imports Phaser.
+// Headless core: owns every rule of a Run and never imports Phaser.
 
 export type RunStatus = 'playing' | 'paused' | 'over';
 

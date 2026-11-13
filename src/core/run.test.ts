@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRun } from './game';
+import { createRun } from './run';
 
 describe('a new Run', () => {
   it('starts on Level 1 with a Score of 0 and is playing', () => {
