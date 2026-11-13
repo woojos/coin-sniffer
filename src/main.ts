@@ -1,4 +1,5 @@
 import { AUTO, Game, Scale } from 'phaser';
+import { RunOverScene } from './scenes/RunOverScene';
 import { PlayScene } from './scenes/PlayScene';
 import { TitleScene } from './scenes/TitleScene';
 
@@ -9,5 +10,5 @@ new Game({
   height: 600,
   backgroundColor: '#1a1410',
   scale: { mode: Scale.FIT, autoCenter: Scale.CENTER_BOTH },
-  scene: [TitleScene, PlayScene],
+  scene: [TitleScene, PlayScene, RunOverScene],
 });

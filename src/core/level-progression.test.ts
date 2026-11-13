@@ -4,7 +4,7 @@ import { key, minerTile, walkTo } from './testing/walk';
 
 describe('Level progression', () => {
   it('walking onto the end Gate starts Level 2 at its start Gate, keeping the Score', () => {
-    const run = createRun({ seed: 7 });
+    const run = createRun({ seed: 7, monsters: false });
     const first = run.state();
     let lastLevel1Score = 0;
     walkTo(run, first.level.endGate, () => {
@@ -22,7 +22,7 @@ describe('Level progression', () => {
   });
 
   it('offers no way back: returning to the start Gate keeps the Miner on the same Level', () => {
-    const run = createRun({ seed: 7 });
+    const run = createRun({ seed: 7, monsters: false });
     walkTo(run, run.state().level.endGate);
     const level2 = run.state().level;
     const startRoom = level2.rooms[level2.mainPath[0]!]!;
@@ -45,8 +45,8 @@ describe('Level progression', () => {
       }
       return seen;
     };
-    const a = levelsOf(createRun({ seed: 3 }));
-    const b = levelsOf(createRun({ seed: 3 }));
+    const a = levelsOf(createRun({ seed: 3, monsters: false }));
+    const b = levelsOf(createRun({ seed: 3, monsters: false }));
 
     expect(a.map((s) => s.levelNumber)).toEqual([1, 2, 3, 4]);
     expect(a.map((s) => s.level)).toEqual(b.map((s) => s.level));
@@ -59,7 +59,7 @@ function coinsOnLevels1And5(seeds: readonly number[]): { level1: Coin[]; level5:
   const level1: Coin[] = [];
   const level5: Coin[] = [];
   for (const seed of seeds) {
-    const run = createRun({ seed });
+    const run = createRun({ seed, monsters: false });
     level1.push(...run.state().level.coins);
     while (run.state().levelNumber < 5) walkTo(run, run.state().level.endGate);
     level5.push(...run.state().level.coins);

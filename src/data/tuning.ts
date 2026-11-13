@@ -18,6 +18,10 @@ export const MINER_TUNING = {
   speed: 5,
   /** Width and height of the Miner's body, in tiles. */
   size: 0.7,
+  /** Life at the start of a Run, in whole points. It never refills. */
+  life: 100,
+  /** How long the Miner cannot be hurt again after a hit. */
+  invulnerabilityMs: 1000,
 } as const;
 
 /** Face values of the five Coin Denominations. They never change. */
@@ -49,4 +53,25 @@ export const COIN_TUNING = {
   sideRoomRichness: 2.5,
   /** Width and height of a Coin's pick-up box, in tiles. */
   size: 0.4,
+} as const;
+
+export const MONSTER_TUNING = {
+  crawler: {
+    /** Tiles per second; slower than the Miner so he can always get away. */
+    speed: 2,
+    /** Width and height of the Crawler's body, in tiles. */
+    size: 0.7,
+    /** Life taken from the Miner on contact. */
+    damage: 10,
+    /** Wakes when the Miner's centre comes this close, in tiles. */
+    sightRange: 5,
+    /** Gives up when the Miner's centre gets farther than this, in tiles. */
+    giveUpRange: 8,
+  },
+  /** Expected Monsters per floor tile of a Main Path Room. */
+  roomDensity: 0.02,
+  /** Side Rooms hold this many times more Monsters per tile than Main Path Rooms. */
+  sideRoomRichness: 2,
+  /** Most Monsters a single Room ever holds. */
+  maxPerRoom: 5,
 } as const;

@@ -5,12 +5,13 @@ import {
   type Denomination,
   type Direction,
   type Level,
+  type Monster,
   type Run,
   type Tile,
   type VisitedAreas,
 } from '../core/run';
 import { tileKey } from '../core/tile';
-import { MINER_TUNING } from '../data/tuning';
+import { MINER_TUNING, MONSTER_TUNING } from '../data/tuning';
 
 const TILE_PX = 32;
 
@@ -22,6 +23,9 @@ const COLOURS = {
   facing: 0xffffff,
   startGate: 0x4caf50,
   endGate: 0xf2c14e,
+  crawler: 0xc0392b,
+  lifeBar: 0xd64545,
+  lifeBarBack: 0x3a1010,
   hud: '#f2c14e',
 } as const;
 
@@ -45,6 +49,11 @@ const KEY_DIRECTIONS: Readonly<Record<string, Direction>> = {
   ArrowRight: 'right',
 };
 
+const LIFE_BAR = { x: 16, y: 56, width: 200, height: 14 } as const;
+
+/** How long the Miner stays visible, then hidden, while he flashes after a hit. */
+const FLASH_MS = 100;
+
 const FACING_OFFSET: Readonly<Record<Direction, { x: number; y: number }>> = {
   up: { x: 0, y: -1 },
   down: { x: 0, y: 1 },
@@ -58,6 +67,8 @@ export class PlayScene extends Scene {
   private heldKeys: string[] = [];
   private levelGraphics!: GameObjects.Graphics;
   private coinGraphics!: GameObjects.Graphics;
+  private monsterGraphics!: GameObjects.Graphics;
+  private lifeBar!: GameObjects.Graphics;
   private hudText!: GameObjects.Text;
   /** Floor tiles of visited areas, by tile key. */
   private lit = new Map<string, Tile>();
@@ -83,6 +94,7 @@ export class PlayScene extends Scene {
     this.cameras.main.setBackgroundColor(COLOURS.darkness);
     this.levelGraphics = this.add.graphics();
     this.coinGraphics = this.add.graphics();
+    this.monsterGraphics = this.add.graphics();
     const minerPx = MINER_TUNING.size * TILE_PX;
     this.miner = this.add.rectangle(0, 0, minerPx, minerPx, COLOURS.miner);
     this.facingMarker = this.add.rectangle(0, 0, minerPx / 4, minerPx / 4, COLOURS.facing);
@@ -97,6 +109,7 @@ export class PlayScene extends Scene {
       })
       .setScrollFactor(0)
       .setDepth(1);
+    this.lifeBar = this.add.graphics().setScrollFactor(0).setDepth(1);
 
     this.wireDirectionKeys();
     this.render();
@@ -106,6 +119,8 @@ export class PlayScene extends Scene {
     const lastKey = this.heldKeys[this.heldKeys.length - 1];
     this.run.update({ direction: lastKey ? (KEY_DIRECTIONS[lastKey] ?? null) : null }, delta);
     this.render();
+    const { status, score, levelNumber } = this.run.state();
+    if (status === 'over') this.scene.start('RunOver', { score, levelNumber });
   }
 
   private wireDirectionKeys(): void {
@@ -133,7 +148,7 @@ export class PlayScene extends Scene {
   }
 
   private render(): void {
-    const { level, levelNumber, miner, visited, coins, score } = this.run.state();
+    const { level, levelNumber, miner, life, invulnerableMs, visited, coins, monsters, score } = this.run.state();
     if (level !== this.drawnLevel) {
       this.cameras.main.setBounds(0, 0, level.width * TILE_PX, level.height * TILE_PX);
       this.drawnLevel = level;
@@ -151,12 +166,38 @@ export class PlayScene extends Scene {
       this.drawCoins(coins);
       this.drawnCoinKey = coinKey;
     }
+    this.drawMonsters(monsters);
     this.hudText.setText(`Level ${levelNumber}   Score: ${score}`);
+    this.drawLifeBar(life);
 
     this.miner.setPosition(miner.x * TILE_PX, miner.y * TILE_PX);
     const offset = FACING_OFFSET[miner.facing];
     const reach = (MINER_TUNING.size * TILE_PX) / 2;
     this.facingMarker.setPosition(this.miner.x + offset.x * reach, this.miner.y + offset.y * reach);
+    const hidden = invulnerableMs > 0 && Math.floor(invulnerableMs / FLASH_MS) % 2 === 1;
+    this.miner.setVisible(!hidden);
+    this.facingMarker.setVisible(!hidden);
+  }
+
+  /** Draws Monsters in visited areas only; Monsters in the dark stay hidden. */
+  private drawMonsters(monsters: readonly Monster[]): void {
+    const g = this.monsterGraphics.clear();
+    const size = MONSTER_TUNING.crawler.size * TILE_PX;
+    for (const monster of monsters) {
+      if (!this.lit.has(tileKey({ x: Math.floor(monster.x), y: Math.floor(monster.y) }))) continue;
+      const cx = monster.x * TILE_PX;
+      const cy = monster.y * TILE_PX;
+      g.fillStyle(COLOURS.crawler).fillCircle(cx, cy, size / 2);
+      g.lineStyle(2, 0x000000, 0.6).strokeCircle(cx, cy, size / 2);
+    }
+  }
+
+  private drawLifeBar(life: number): void {
+    const { x, y, width, height } = LIFE_BAR;
+    const g = this.lifeBar.clear();
+    g.fillStyle(COLOURS.lifeBarBack).fillRect(x, y, width, height);
+    g.fillStyle(COLOURS.lifeBar).fillRect(x, y, (width * life) / MINER_TUNING.life, height);
+    g.lineStyle(2, 0x000000).strokeRect(x, y, width, height);
   }
 
   /** Draws only visited areas and the walls around them; everything else stays dark. */

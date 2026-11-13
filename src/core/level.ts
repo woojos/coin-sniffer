@@ -1,5 +1,6 @@
 import { COIN_TUNING, LEVEL_TUNING } from '../data/tuning';
 import { denominationWeights, placeCoins, type Coin } from './coins';
+import { placeMonsters, type Monster } from './monsters';
 import { createRandom, type Random } from './random';
 import { tileKey as key, type Tile } from './tile';
 
@@ -41,6 +42,8 @@ export interface Level {
   readonly endGate: Tile;
   /** Every Coin as the Level was generated; the Run tracks which are still uncollected. */
   readonly coins: readonly Coin[];
+  /** Every Monster as the Level was generated, idle where it spawned. */
+  readonly monsters: readonly Monster[];
 }
 
 const MAX_LAYOUT_ATTEMPTS = 1000;
@@ -218,7 +221,7 @@ function randomRoomSize(random: Random): { width: number; height: number } {
   };
 }
 
-/** Shifts the draft so a one-tile wall border surrounds it, then places the Gates and Coins. */
+/** Shifts the draft so a one-tile wall border surrounds it, then places the Gates, Coins and Monsters. */
 function toLevel(seed: number, levelNumber: number, draft: Draft, random: Random): Level {
   const tiles = [
     ...draft.rooms.flatMap((room) => rectTiles(room.rect)),
@@ -256,8 +259,9 @@ function toLevel(seed: number, levelNumber: number, draft: Draft, random: Random
     ],
     [startGate, endGate],
   );
+  const monsters = placeMonsters(random, rooms, startRoom.id, [startGate, endGate]);
 
-  return { seed, width, height, floor, rooms, corridors, mainPath, startGate, endGate, coins };
+  return { seed, width, height, floor, rooms, corridors, mainPath, startGate, endGate, coins, monsters };
 }
 
 function farthestTile(rect: Rect, from: Tile): Tile {
