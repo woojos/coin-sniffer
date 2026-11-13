@@ -57,6 +57,10 @@ A Monster that waits, then dashes at the Miner.
 What the Miner fights with, defined by parameters such as attack strength. The Miner starts with a sword.
 _Avoid_: Gear, equipment
 
+**Swing**:
+One use of the Weapon, hitting Monsters in a short arc in front of the Miner.
+_Avoid_: Attack, slash
+
 **Life**:
 The Miner's remaining health. The Run ends when it reaches zero.
 _Avoid_: HP, health bar
