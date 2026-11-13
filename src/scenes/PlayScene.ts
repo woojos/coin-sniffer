@@ -28,7 +28,7 @@ const COLOURS = {
   endGate: 0xf2c14e,
   crawler: 0xc0392b,
   monsterHit: 0xffffff,
-  swing: 0xe8e8e8,
+  swing: 0xffffff,
   lifeBar: 0xd64545,
   lifeBarBack: 0x3a1010,
   hud: '#f2c14e',
@@ -56,6 +56,9 @@ const KEY_DIRECTIONS: Readonly<Record<string, Direction>> = {
 
 const LIFE_BAR = { x: 16, y: 56, width: 200, height: 14 } as const;
 
+/** How long the full Swing arc stays on screen, fading out, after its hit lands. */
+const SWING_AFTERGLOW_MS = 200;
+
 /** How long the Miner stays visible, then hidden, while he flashes after a hit. */
 const FLASH_MS = 100;
 
@@ -77,6 +80,9 @@ export class PlayScene extends Scene {
   private coinGraphics!: GameObjects.Graphics;
   private monsterGraphics!: GameObjects.Graphics;
   private swingGraphics!: GameObjects.Graphics;
+  /** The facing of the last Swing to land, and how much longer its arc stays on screen. */
+  private swingAfterglow: { facing: Direction; ms: number } | null = null;
+  private lastSwing: SwingState | null = null;
   private lifeBar!: GameObjects.Graphics;
   private hudText!: GameObjects.Text;
   /** Floor tiles of visited areas, by tile key. */
@@ -98,6 +104,8 @@ export class PlayScene extends Scene {
     this.heldKeys = [];
     this.swingHeld = false;
     this.swingTapped = false;
+    this.swingAfterglow = null;
+    this.lastSwing = null;
     this.drawnLevel = null;
     this.drawnVisitKey = '';
     this.drawnCoinKey = '';
@@ -132,7 +140,7 @@ export class PlayScene extends Scene {
     const direction = lastKey ? (KEY_DIRECTIONS[lastKey] ?? null) : null;
     this.run.update({ direction, swing: this.swingHeld || this.swingTapped }, delta);
     this.swingTapped = false;
-    this.render();
+    this.render(delta);
     const { status, score, levelNumber } = this.run.state();
     if (status === 'over') this.scene.start('RunOver', { score, levelNumber });
   }
@@ -167,7 +175,7 @@ export class PlayScene extends Scene {
     });
   }
 
-  private render(): void {
+  private render(elapsedMs = 0): void {
     const { level, levelNumber, miner, life, invulnerableMs, weapon, swing, visited, coins, monsters, score } =
       this.run.state();
     if (level !== this.drawnLevel) {
@@ -198,18 +206,39 @@ export class PlayScene extends Scene {
     const hidden = invulnerableMs > 0 && Math.floor(invulnerableMs / FLASH_MS) % 2 === 1;
     this.miner.setVisible(!hidden);
     this.facingMarker.setVisible(!hidden);
-    this.drawSwing(swing, weapon);
+    this.drawSwing(swing, weapon, elapsedMs);
   }
 
-  /** Sweeps the Swing's arc in front of the Miner, filling in as the hit approaches. */
-  private drawSwing(swing: SwingState | null, weapon: Weapon): void {
+  /**
+   * Sweeps the Swing's arc open in front of the Miner as the hit approaches, then leaves the
+   * whole arc on screen, fading, for a moment after it lands so the Swing is easy to see.
+   */
+  private drawSwing(swing: SwingState | null, weapon: Weapon, elapsedMs: number): void {
     const g = this.swingGraphics.clear();
-    if (swing === null) return;
+    if (swing === null && this.lastSwing !== null) {
+      this.swingAfterglow = { facing: this.lastSwing.facing, ms: SWING_AFTERGLOW_MS };
+    } else if (this.swingAfterglow) {
+      this.swingAfterglow.ms -= elapsedMs;
+      if (this.swingAfterglow.ms <= 0 || swing !== null) this.swingAfterglow = null;
+    }
+    this.lastSwing = swing;
+
+    const arc = swing
+      ? { facing: swing.facing, sweep: Math.max(0.15, swing.progress), alpha: 0.45 }
+      : this.swingAfterglow && {
+          facing: this.swingAfterglow.facing,
+          sweep: 1,
+          alpha: 0.7 * (this.swingAfterglow.ms / SWING_AFTERGLOW_MS),
+        };
+    if (!arc) return;
     const half = halfArc(weapon);
-    const start = FACING_ANGLE[swing.facing] - half;
-    g.fillStyle(COLOURS.swing, 0.25 + 0.35 * swing.progress)
-      .slice(this.miner.x, this.miner.y, weapon.reach * TILE_PX, start, start + 2 * half * swing.progress)
-      .fillPath();
+    const start = FACING_ANGLE[arc.facing] - half;
+    const end = start + 2 * half * arc.sweep;
+    const radius = weapon.reach * TILE_PX;
+    g.fillStyle(COLOURS.swing, arc.alpha).slice(this.miner.x, this.miner.y, radius, start, end).fillPath();
+    g.lineStyle(2, COLOURS.swing, Math.min(1, arc.alpha * 1.4))
+      .slice(this.miner.x, this.miner.y, radius, start, end)
+      .strokePath();
   }
 
   /** Draws Monsters in visited areas only; Monsters in the dark stay hidden. */
