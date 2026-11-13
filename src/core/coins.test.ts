@@ -31,19 +31,19 @@ describe('Coin placement', () => {
   });
 
   it('puts Coins in every Room, in proportion to its area', () => {
-    const perTile = { small: [0, 0], large: [0, 0] };
+    const totals = { small: { coins: 0, area: 0 }, large: { coins: 0, area: 0 } };
     for (const seed of SEEDS) {
       const { level, coins } = createRun({ seed }).state();
       for (const room of level.rooms.filter((r) => r.kind === 'main')) {
         const count = coins.filter((c) => inRoom(level, c)?.id === room.id).length;
         expect(count).toBeGreaterThan(0);
-        const bucket = room.width * room.height < 120 ? perTile.small : perTile.large;
-        bucket[0]! += count;
-        bucket[1]! += room.width * room.height;
+        const bucket = room.width * room.height < 120 ? totals.small : totals.large;
+        bucket.coins += count;
+        bucket.area += room.width * room.height;
       }
     }
-    const small = perTile.small[0]! / perTile.small[1]!;
-    const large = perTile.large[0]! / perTile.large[1]!;
+    const small = totals.small.coins / totals.small.area;
+    const large = totals.large.coins / totals.large.area;
     expect(large / small).toBeGreaterThan(0.8);
     expect(large / small).toBeLessThan(1.25);
   });
@@ -70,12 +70,12 @@ describe('Coin placement', () => {
   });
 });
 
-/** Walks to the tile of a Coin in the start Room and returns the Coins collected on the way. */
-function collectNearestCoin(run: Run): { target: Coin; collected: Coin[] } {
+/** Walks to the first Coin listed in the start Room and returns the Coins collected on the way. */
+function collectStartRoomCoin(run: Run, afterEachUpdate?: () => void): { target: Coin; collected: Coin[] } {
   const before = run.state();
   const startRoom = before.level.rooms[before.level.mainPath[0]!]!;
   const target = before.coins.find((c) => inRoom(before.level, c)?.id === startRoom.id)!;
-  walkTo(run, target);
+  walkTo(run, target, afterEachUpdate);
   const remaining = new Set(run.state().coins.map((c) => c.id));
   return { target, collected: before.coins.filter((c) => !remaining.has(c.id)) };
 }
@@ -90,15 +90,27 @@ describe('Coin collection', () => {
   it('collects a Coin on contact and adds its Denomination to the Score', () => {
     for (const seed of SEEDS.slice(0, 30)) {
       const run = createRun({ seed });
-      const { target, collected } = collectNearestCoin(run);
+      const { target, collected } = collectStartRoomCoin(run);
       expect(collected.map((c) => c.id)).toContain(target.id);
       expect(run.state().score).toBe(collected.reduce((sum, c) => sum + c.denomination, 0));
     }
   });
 
+  it('adds a Coin to the Score in the same update that collects it', () => {
+    const run = createRun({ seed: 5 });
+    const all = run.state().coins;
+    collectStartRoomCoin(run, () => {
+      const { coins, score } = run.state();
+      const remaining = new Set(coins.map((c) => c.id));
+      const collectedValue = all.filter((c) => !remaining.has(c.id)).reduce((sum, c) => sum + c.denomination, 0);
+      expect(score).toBe(collectedValue);
+    });
+    expect(run.state().score).toBeGreaterThan(0);
+  });
+
   it('collects each Coin only once', () => {
     const run = createRun({ seed: 5 });
-    const { target } = collectNearestCoin(run);
+    const { target } = collectStartRoomCoin(run);
     const score = run.state().score;
     const { level } = run.state();
     walkTo(run, level.startGate);

@@ -4,7 +4,8 @@ import { touchesCoin, type Coin } from './coins';
 import { areaAt, generateLevel, type Level } from './level';
 import { moveMiner, type Direction, type Miner } from './miner';
 
-export type { Corridor, Level, Rect, Room, RoomKind, Tile } from './level';
+export type { Corridor, Level, Rect, Room, RoomKind } from './level';
+export type { Tile } from './tile';
 export type { Coin } from './coins';
 export type { Direction, Miner } from './miner';
 export type { Denomination } from '../data/tuning';
@@ -63,8 +64,7 @@ export function createRun(options: RunOptions): Run {
   };
 
   const collectTouchedCoins = (): void => {
-    const half = MINER_TUNING.size / 2;
-    const touched = coins.filter((coin) => touchesCoin(miner.x, miner.y, half, coin));
+    const touched = coins.filter((coin) => touchesCoin(miner, coin));
     if (touched.length === 0) return;
     score += touched.reduce((sum, coin) => sum + coin.denomination, 0);
     coins = coins.filter((coin) => !touched.includes(coin));

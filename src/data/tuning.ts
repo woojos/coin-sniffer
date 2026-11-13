@@ -29,7 +29,10 @@ export const COIN_TUNING = {
   denominationWeights: { 1: 55, 5: 30, 10: 12, 25: 3, 100: 0 } satisfies Record<Denomination, number>,
   /** Expected Coins per floor tile of a Main Path Room. */
   roomDensity: 0.04,
-  /** Expected Coins per Corridor tile. */
+  /**
+   * Expected Coins per Corridor tile. Higher than in Rooms because Corridors are short
+   * (3 to 14 tiles), so at Room density most would hold no Coin at all.
+   */
   corridorDensity: 0.08,
   /** Side Rooms hold this many times more Coins per tile than Main Path Rooms. */
   sideRoomRichness: 2.5,

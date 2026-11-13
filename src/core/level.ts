@@ -1,11 +1,7 @@
 import { COIN_TUNING, LEVEL_TUNING } from '../data/tuning';
 import { placeCoins, type Coin } from './coins';
 import { createRandom, type Random } from './random';
-
-export interface Tile {
-  readonly x: number;
-  readonly y: number;
-}
+import { tileKey as key, type Tile } from './tile';
 
 export type RoomKind = 'main' | 'side';
 
@@ -80,7 +76,6 @@ interface Proposal {
 }
 
 const CORRIDOR = -1;
-const key = (tile: Tile): string => `${tile.x},${tile.y}`;
 
 /** A Level under construction, in unshifted coordinates. Every new Room hangs off one parent, so the layout is a tree. */
 class Draft {
@@ -257,7 +252,7 @@ function toLevel(seed: number, draft: Draft, random: Random): Level {
       ...rooms.map((room) => ({ tiles: rectTiles(room), density: roomDensity(room) })),
       ...corridors.map((corridor) => ({ tiles: corridor.tiles, density: COIN_TUNING.corridorDensity })),
     ],
-    new Set([startGate, endGate].map(key)),
+    [startGate, endGate],
   );
 
   return { seed, width, height, floor, rooms, corridors, mainPath, startGate, endGate, coins };

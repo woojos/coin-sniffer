@@ -9,6 +9,7 @@ import {
   type Tile,
   type VisitedAreas,
 } from '../core/run';
+import { tileKey } from '../core/tile';
 import { MINER_TUNING } from '../data/tuning';
 
 const TILE_PX = 32;
@@ -21,6 +22,7 @@ const COLOURS = {
   facing: 0xffffff,
   startGate: 0x4caf50,
   endGate: 0xf2c14e,
+  score: '#f2c14e',
 } as const;
 
 /** Bronze, silver, gold, ruby and diamond: colour, size and shape all differ, so value reads at a glance. */
@@ -57,8 +59,8 @@ export class PlayScene extends Scene {
   private levelGraphics!: GameObjects.Graphics;
   private coinGraphics!: GameObjects.Graphics;
   private scoreText!: GameObjects.Text;
-  /** Floor tiles of visited areas, keyed "x,y". */
-  private lit = new Set<string>();
+  /** Floor tiles of visited areas, by tile key. */
+  private lit = new Map<string, Tile>();
   private miner!: GameObjects.Rectangle;
   private facingMarker!: GameObjects.Rectangle;
   private drawnVisitKey = '';
@@ -89,7 +91,7 @@ export class PlayScene extends Scene {
       .text(16, 12, '', {
         fontFamily: 'monospace',
         fontSize: '24px',
-        color: '#f2c14e',
+        color: COLOURS.score,
         backgroundColor: '#000000aa',
         padding: { x: 8, y: 4 },
       })
@@ -134,7 +136,8 @@ export class PlayScene extends Scene {
     const { level, miner, visited, coins, score } = this.run.state();
     const visitKey = `${visited.rooms.join(',')}|${visited.corridors.join(',')}`;
     if (visitKey !== this.drawnVisitKey) {
-      this.drawLevel(level, visited);
+      this.lit = litTiles(level, visited);
+      this.drawLevel(level);
       this.drawnVisitKey = visitKey;
     }
     const coinKey = `${visitKey}|${coins.length}`;
@@ -151,19 +154,8 @@ export class PlayScene extends Scene {
   }
 
   /** Draws only visited areas and the walls around them; everything else stays dark. */
-  private drawLevel(level: Level, visited: VisitedAreas): void {
-    const lit = new Map<string, Tile>();
-    for (const id of visited.rooms) {
-      const room = level.rooms[id]!;
-      for (let y = room.y; y < room.y + room.height; y++) {
-        for (let x = room.x; x < room.x + room.width; x++) lit.set(`${x},${y}`, { x, y });
-      }
-    }
-    for (const id of visited.corridors) {
-      for (const tile of level.corridors[id]!.tiles) lit.set(`${tile.x},${tile.y}`, tile);
-    }
-
-    this.lit = new Set(lit.keys());
+  private drawLevel(level: Level): void {
+    const lit = this.lit;
     const g = this.levelGraphics.clear();
     for (const { x, y } of lit.values()) {
       g.fillStyle(COLOURS.floor).fillRect(x * TILE_PX, y * TILE_PX, TILE_PX, TILE_PX);
@@ -180,7 +172,7 @@ export class PlayScene extends Scene {
       [level.startGate, COLOURS.startGate],
       [level.endGate, COLOURS.endGate],
     ] as const) {
-      if (lit.has(`${gate.x},${gate.y}`)) {
+      if (lit.has(tileKey(gate))) {
         g.lineStyle(3, colour).strokeRect(gate.x * TILE_PX + 3, gate.y * TILE_PX + 3, TILE_PX - 6, TILE_PX - 6);
       }
     }
@@ -190,7 +182,7 @@ export class PlayScene extends Scene {
   private drawCoins(coins: readonly Coin[]): void {
     const g = this.coinGraphics.clear();
     for (const coin of coins) {
-      if (!this.lit.has(`${coin.x},${coin.y}`)) continue;
+      if (!this.lit.has(tileKey(coin))) continue;
       const { colour, radius, shape } = COIN_LOOKS[coin.denomination];
       const cx = (coin.x + 0.5) * TILE_PX;
       const cy = (coin.y + 0.5) * TILE_PX;
@@ -208,4 +200,20 @@ export class PlayScene extends Scene {
       }
     }
   }
+}
+
+/** Floor tiles of the visited Rooms and Corridors, by tile key. */
+function litTiles(level: Level, visited: VisitedAreas): Map<string, Tile> {
+  const lit = new Map<string, Tile>();
+  const light = (tile: Tile): void => {
+    lit.set(tileKey(tile), tile);
+  };
+  for (const id of visited.rooms) {
+    const room = level.rooms[id]!;
+    for (let y = room.y; y < room.y + room.height; y++) {
+      for (let x = room.x; x < room.x + room.width; x++) light({ x, y });
+    }
+  }
+  for (const id of visited.corridors) level.corridors[id]!.tiles.forEach(light);
+  return lit;
 }

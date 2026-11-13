@@ -40,7 +40,7 @@ export const minerTile = (run: Run): Tile => {
  * Holds the direction of each route step until the Miner's centre enters the next tile,
  * in coarse 50 ms updates, like a player who does not line up perfectly.
  */
-export function walkTo(run: Run, target: Tile): void {
+export function walkTo(run: Run, target: Tile, afterEachUpdate?: () => void): void {
   const path = route(run.state().level, minerTile(run), target);
   for (let i = 1; i < path.length; i++) {
     const from = path[i - 1]!;
@@ -49,6 +49,7 @@ export function walkTo(run: Run, target: Tile): void {
     for (let updates = 0; key(minerTile(run)) !== key(to); updates++) {
       if (updates > 100) throw new Error(`Miner stuck at ${key(minerTile(run))} heading ${direction}`);
       run.update({ direction }, 50);
+      afterEachUpdate?.();
     }
   }
 }
