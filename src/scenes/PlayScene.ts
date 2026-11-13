@@ -1,5 +1,14 @@
-import { type GameObjects, Scene } from 'phaser';
-import { createRun, type Direction, type Level, type Run, type Tile, type VisitedAreas } from '../core/run';
+import { type GameObjects, Math as PhaserMath, Scene } from 'phaser';
+import {
+  createRun,
+  type Coin,
+  type Denomination,
+  type Direction,
+  type Level,
+  type Run,
+  type Tile,
+  type VisitedAreas,
+} from '../core/run';
 import { MINER_TUNING } from '../data/tuning';
 
 const TILE_PX = 32;
@@ -13,6 +22,15 @@ const COLOURS = {
   startGate: 0x4caf50,
   endGate: 0xf2c14e,
 } as const;
+
+/** Bronze, silver, gold, ruby and diamond: colour, size and shape all differ, so value reads at a glance. */
+const COIN_LOOKS: Readonly<Record<Denomination, { colour: number; radius: number; shape: 'disc' | 'gem' }>> = {
+  1: { colour: 0xcd7f32, radius: 5, shape: 'disc' },
+  5: { colour: 0xd8d8d8, radius: 6, shape: 'disc' },
+  10: { colour: 0xffd700, radius: 7, shape: 'disc' },
+  25: { colour: 0xe0115f, radius: 8, shape: 'gem' },
+  100: { colour: 0xb9f2ff, radius: 10, shape: 'gem' },
+};
 
 const KEY_DIRECTIONS: Readonly<Record<string, Direction>> = {
   KeyW: 'up',
@@ -37,9 +55,14 @@ export class PlayScene extends Scene {
   /** Held direction keys in the order they were pressed; the last one wins. */
   private heldKeys: string[] = [];
   private levelGraphics!: GameObjects.Graphics;
+  private coinGraphics!: GameObjects.Graphics;
+  private scoreText!: GameObjects.Text;
+  /** Floor tiles of visited areas, keyed "x,y". */
+  private lit = new Set<string>();
   private miner!: GameObjects.Rectangle;
   private facingMarker!: GameObjects.Rectangle;
   private drawnVisitKey = '';
+  private drawnCoinKey = '';
 
   constructor() {
     super('Play');
@@ -51,15 +74,27 @@ export class PlayScene extends Scene {
     this.run = createRun({ seed });
     this.heldKeys = [];
     this.drawnVisitKey = '';
+    this.drawnCoinKey = '';
 
     const { level } = this.run.state();
     this.cameras.main.setBackgroundColor(COLOURS.darkness);
     this.levelGraphics = this.add.graphics();
+    this.coinGraphics = this.add.graphics();
     const minerPx = MINER_TUNING.size * TILE_PX;
     this.miner = this.add.rectangle(0, 0, minerPx, minerPx, COLOURS.miner);
     this.facingMarker = this.add.rectangle(0, 0, minerPx / 4, minerPx / 4, COLOURS.facing);
     this.cameras.main.setBounds(0, 0, level.width * TILE_PX, level.height * TILE_PX);
     this.cameras.main.startFollow(this.miner, true);
+    this.scoreText = this.add
+      .text(16, 12, '', {
+        fontFamily: 'monospace',
+        fontSize: '24px',
+        color: '#f2c14e',
+        backgroundColor: '#000000aa',
+        padding: { x: 8, y: 4 },
+      })
+      .setScrollFactor(0)
+      .setDepth(1);
 
     this.wireDirectionKeys();
     this.render();
@@ -96,12 +131,18 @@ export class PlayScene extends Scene {
   }
 
   private render(): void {
-    const { level, miner, visited } = this.run.state();
+    const { level, miner, visited, coins, score } = this.run.state();
     const visitKey = `${visited.rooms.join(',')}|${visited.corridors.join(',')}`;
     if (visitKey !== this.drawnVisitKey) {
       this.drawLevel(level, visited);
       this.drawnVisitKey = visitKey;
     }
+    const coinKey = `${visitKey}|${coins.length}`;
+    if (coinKey !== this.drawnCoinKey) {
+      this.drawCoins(coins);
+      this.drawnCoinKey = coinKey;
+    }
+    this.scoreText.setText(`Score: ${score}`);
 
     this.miner.setPosition(miner.x * TILE_PX, miner.y * TILE_PX);
     const offset = FACING_OFFSET[miner.facing];
@@ -122,6 +163,7 @@ export class PlayScene extends Scene {
       for (const tile of level.corridors[id]!.tiles) lit.set(`${tile.x},${tile.y}`, tile);
     }
 
+    this.lit = new Set(lit.keys());
     const g = this.levelGraphics.clear();
     for (const { x, y } of lit.values()) {
       g.fillStyle(COLOURS.floor).fillRect(x * TILE_PX, y * TILE_PX, TILE_PX, TILE_PX);
@@ -140,6 +182,29 @@ export class PlayScene extends Scene {
     ] as const) {
       if (lit.has(`${gate.x},${gate.y}`)) {
         g.lineStyle(3, colour).strokeRect(gate.x * TILE_PX + 3, gate.y * TILE_PX + 3, TILE_PX - 6, TILE_PX - 6);
+      }
+    }
+  }
+
+  /** Draws uncollected Coins in visited areas only; Coins in the dark stay hidden. */
+  private drawCoins(coins: readonly Coin[]): void {
+    const g = this.coinGraphics.clear();
+    for (const coin of coins) {
+      if (!this.lit.has(`${coin.x},${coin.y}`)) continue;
+      const { colour, radius, shape } = COIN_LOOKS[coin.denomination];
+      const cx = (coin.x + 0.5) * TILE_PX;
+      const cy = (coin.y + 0.5) * TILE_PX;
+      g.fillStyle(colour);
+      if (shape === 'disc') {
+        g.fillCircle(cx, cy, radius).lineStyle(1, 0x000000, 0.5).strokeCircle(cx, cy, radius);
+      } else {
+        const points = [
+          new PhaserMath.Vector2(cx, cy - radius),
+          new PhaserMath.Vector2(cx + radius, cy),
+          new PhaserMath.Vector2(cx, cy + radius),
+          new PhaserMath.Vector2(cx - radius, cy),
+        ];
+        g.fillPoints(points, true).lineStyle(2, 0xffffff, 0.8).strokePoints(points, true);
       }
     }
   }

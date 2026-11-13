@@ -19,3 +19,20 @@ export const MINER_TUNING = {
   /** Width and height of the Miner's body, in tiles. */
   size: 0.7,
 } as const;
+
+/** Face values of the five Coin Denominations. They never change. */
+export const DENOMINATIONS = [1, 5, 10, 25, 100] as const;
+export type Denomination = (typeof DENOMINATIONS)[number];
+
+export const COIN_TUNING = {
+  /** Relative chance of each Denomination. A single table for now; it varies by Level later. */
+  denominationWeights: { 1: 55, 5: 30, 10: 12, 25: 3, 100: 0 } satisfies Record<Denomination, number>,
+  /** Expected Coins per floor tile of a Main Path Room. */
+  roomDensity: 0.04,
+  /** Expected Coins per Corridor tile. */
+  corridorDensity: 0.08,
+  /** Side Rooms hold this many times more Coins per tile than Main Path Rooms. */
+  sideRoomRichness: 2.5,
+  /** Width and height of a Coin's pick-up box, in tiles. */
+  size: 0.4,
+} as const;

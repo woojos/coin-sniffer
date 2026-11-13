@@ -1,4 +1,5 @@
-import { LEVEL_TUNING } from '../data/tuning';
+import { COIN_TUNING, LEVEL_TUNING } from '../data/tuning';
+import { placeCoins, type Coin } from './coins';
 import { createRandom, type Random } from './random';
 
 export interface Tile {
@@ -42,6 +43,8 @@ export interface Level {
   readonly mainPath: readonly number[];
   readonly startGate: Tile;
   readonly endGate: Tile;
+  /** Every Coin as the Level was generated; the Run tracks which are still uncollected. */
+  readonly coins: readonly Coin[];
 }
 
 const MAX_LAYOUT_ATTEMPTS = 1000;
@@ -52,7 +55,7 @@ export function generateLevel(seed: number): Level {
   const random = createRandom(seed);
   for (let attempt = 0; attempt < MAX_LAYOUT_ATTEMPTS; attempt++) {
     const draft = tryLayout(random);
-    if (draft) return toLevel(seed, draft);
+    if (draft) return toLevel(seed, draft, random);
   }
   throw new Error(`Could not generate a Level for seed ${seed}`);
 }
@@ -219,8 +222,8 @@ function randomRoomSize(random: Random): { width: number; height: number } {
   };
 }
 
-/** Shifts the draft so a one-tile wall border surrounds it, and places the Gates. */
-function toLevel(seed: number, draft: Draft): Level {
+/** Shifts the draft so a one-tile wall border surrounds it, then places the Gates and Coins. */
+function toLevel(seed: number, draft: Draft, random: Random): Level {
   const tiles = [
     ...draft.rooms.flatMap((room) => rectTiles(room.rect)),
     ...draft.corridors.flatMap((corridor) => corridor.tiles),
@@ -244,17 +247,20 @@ function toLevel(seed: number, draft: Draft): Level {
   const entryCorridor = corridors.find((c) => c.to === endRoom.id)!;
   const entryTile = entryCorridor.tiles[entryCorridor.tiles.length - 1]!;
 
-  return {
-    seed,
-    width,
-    height,
-    floor,
-    rooms,
-    corridors,
-    mainPath,
-    startGate: farthestTile(startRoom, startMouth),
-    endGate: farthestTile(endRoom, entryTile),
-  };
+  const startGate = farthestTile(startRoom, startMouth);
+  const endGate = farthestTile(endRoom, entryTile);
+  const roomDensity = (room: Room): number =>
+    COIN_TUNING.roomDensity * (room.kind === 'side' ? COIN_TUNING.sideRoomRichness : 1);
+  const coins = placeCoins(
+    random,
+    [
+      ...rooms.map((room) => ({ tiles: rectTiles(room), density: roomDensity(room) })),
+      ...corridors.map((corridor) => ({ tiles: corridor.tiles, density: COIN_TUNING.corridorDensity })),
+    ],
+    new Set([startGate, endGate].map(key)),
+  );
+
+  return { seed, width, height, floor, rooms, corridors, mainPath, startGate, endGate, coins };
 }
 
 function farthestTile(rect: Rect, from: Tile): Tile {
