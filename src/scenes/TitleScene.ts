@@ -16,7 +16,7 @@ export class TitleScene extends Scene {
       })
       .setOrigin(0.5);
 
-    // The Play entry does nothing yet; screen navigation comes in a later ticket.
+    // Full menu navigation comes in a later ticket; for now Enter or Space starts a Run.
     this.add
       .text(width / 2, height / 2 + 40, '> Play', {
         fontFamily: 'monospace',
@@ -24,5 +24,12 @@ export class TitleScene extends Scene {
         color: '#ffffff',
       })
       .setOrigin(0.5);
+
+    const keyboard = this.input.keyboard!;
+    const play = (): void => {
+      this.scene.start('Play');
+    };
+    keyboard.once('keydown-ENTER', play);
+    keyboard.once('keydown-SPACE', play);
   }
 }
