@@ -44,6 +44,15 @@ _Avoid_: Tier, type
 A hostile creature that attacks the Miner and can be fought.
 _Avoid_: Enemy, mob
 
+**Crawler**:
+A slow Monster that attacks only in melee.
+
+**Spitter**:
+A Monster that keeps its distance and shoots at the Miner.
+
+**Charger**:
+A Monster that waits, then dashes at the Miner.
+
 **Weapon**:
 What the Miner fights with, defined by parameters such as attack strength. The Miner starts with a sword.
 _Avoid_: Gear, equipment
