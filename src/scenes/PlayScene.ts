@@ -22,7 +22,7 @@ const COLOURS = {
   facing: 0xffffff,
   startGate: 0x4caf50,
   endGate: 0xf2c14e,
-  score: '#f2c14e',
+  hud: '#f2c14e',
 } as const;
 
 /** Bronze, silver, gold, ruby and diamond: colour, size and shape all differ, so value reads at a glance. */
@@ -58,11 +58,12 @@ export class PlayScene extends Scene {
   private heldKeys: string[] = [];
   private levelGraphics!: GameObjects.Graphics;
   private coinGraphics!: GameObjects.Graphics;
-  private scoreText!: GameObjects.Text;
+  private hudText!: GameObjects.Text;
   /** Floor tiles of visited areas, by tile key. */
   private lit = new Map<string, Tile>();
   private miner!: GameObjects.Rectangle;
   private facingMarker!: GameObjects.Rectangle;
+  private drawnLevel: Level | null = null;
   private drawnVisitKey = '';
   private drawnCoinKey = '';
 
@@ -72,26 +73,25 @@ export class PlayScene extends Scene {
 
   create(): void {
     const seed = Math.floor(Math.random() * 2 ** 32);
-    console.info(`Level seed: ${seed}`);
+    console.info(`Run seed: ${seed}`);
     this.run = createRun({ seed });
     this.heldKeys = [];
+    this.drawnLevel = null;
     this.drawnVisitKey = '';
     this.drawnCoinKey = '';
 
-    const { level } = this.run.state();
     this.cameras.main.setBackgroundColor(COLOURS.darkness);
     this.levelGraphics = this.add.graphics();
     this.coinGraphics = this.add.graphics();
     const minerPx = MINER_TUNING.size * TILE_PX;
     this.miner = this.add.rectangle(0, 0, minerPx, minerPx, COLOURS.miner);
     this.facingMarker = this.add.rectangle(0, 0, minerPx / 4, minerPx / 4, COLOURS.facing);
-    this.cameras.main.setBounds(0, 0, level.width * TILE_PX, level.height * TILE_PX);
     this.cameras.main.startFollow(this.miner, true);
-    this.scoreText = this.add
+    this.hudText = this.add
       .text(16, 12, '', {
         fontFamily: 'monospace',
         fontSize: '24px',
-        color: COLOURS.score,
+        color: COLOURS.hud,
         backgroundColor: '#000000aa',
         padding: { x: 8, y: 4 },
       })
@@ -133,7 +133,13 @@ export class PlayScene extends Scene {
   }
 
   private render(): void {
-    const { level, miner, visited, coins, score } = this.run.state();
+    const { level, levelNumber, miner, visited, coins, score } = this.run.state();
+    if (level !== this.drawnLevel) {
+      this.cameras.main.setBounds(0, 0, level.width * TILE_PX, level.height * TILE_PX);
+      this.drawnLevel = level;
+      this.drawnVisitKey = '';
+      this.drawnCoinKey = '';
+    }
     const visitKey = `${visited.rooms.join(',')}|${visited.corridors.join(',')}`;
     if (visitKey !== this.drawnVisitKey) {
       this.lit = litTiles(level, visited);
@@ -145,7 +151,7 @@ export class PlayScene extends Scene {
       this.drawCoins(coins);
       this.drawnCoinKey = coinKey;
     }
-    this.scoreText.setText(`Score: ${score}`);
+    this.hudText.setText(`Level ${levelNumber}   Score: ${score}`);
 
     this.miner.setPosition(miner.x * TILE_PX, miner.y * TILE_PX);
     const offset = FACING_OFFSET[miner.facing];

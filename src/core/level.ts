@@ -1,5 +1,5 @@
 import { COIN_TUNING, LEVEL_TUNING } from '../data/tuning';
-import { placeCoins, type Coin } from './coins';
+import { denominationWeights, placeCoins, type Coin } from './coins';
 import { createRandom, type Random } from './random';
 import { tileKey as key, type Tile } from './tile';
 
@@ -47,11 +47,12 @@ const MAX_LAYOUT_ATTEMPTS = 1000;
 const PLACEMENT_TRIES = 30;
 const SIDE_ROOM_TRIES = 10;
 
-export function generateLevel(seed: number): Level {
+/** Generates Level `levelNumber` of a Run (1 for the first); deeper Levels hold more valuable Coins. */
+export function generateLevel(seed: number, levelNumber: number): Level {
   const random = createRandom(seed);
   for (let attempt = 0; attempt < MAX_LAYOUT_ATTEMPTS; attempt++) {
     const draft = tryLayout(random);
-    if (draft) return toLevel(seed, draft, random);
+    if (draft) return toLevel(seed, levelNumber, draft, random);
   }
   throw new Error(`Could not generate a Level for seed ${seed}`);
 }
@@ -218,7 +219,7 @@ function randomRoomSize(random: Random): { width: number; height: number } {
 }
 
 /** Shifts the draft so a one-tile wall border surrounds it, then places the Gates and Coins. */
-function toLevel(seed: number, draft: Draft, random: Random): Level {
+function toLevel(seed: number, levelNumber: number, draft: Draft, random: Random): Level {
   const tiles = [
     ...draft.rooms.flatMap((room) => rectTiles(room.rect)),
     ...draft.corridors.flatMap((corridor) => corridor.tiles),
@@ -248,6 +249,7 @@ function toLevel(seed: number, draft: Draft, random: Random): Level {
     COIN_TUNING.roomDensity * (room.kind === 'side' ? COIN_TUNING.sideRoomRichness : 1);
   const coins = placeCoins(
     random,
+    denominationWeights(levelNumber),
     [
       ...rooms.map((room) => ({ tiles: rectTiles(room), density: roomDensity(room) })),
       ...corridors.map((corridor) => ({ tiles: corridor.tiles, density: COIN_TUNING.corridorDensity })),

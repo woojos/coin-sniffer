@@ -1,4 +1,10 @@
-import { COIN_TUNING, DENOMINATIONS, MINER_TUNING, type Denomination } from '../data/tuning';
+import {
+  COIN_TUNING,
+  DENOMINATIONS,
+  MINER_TUNING,
+  type Denomination,
+  type DenominationWeights,
+} from '../data/tuning';
 import type { Miner } from './miner';
 import type { Random } from './random';
 import { tileKey, type Tile } from './tile';
@@ -19,7 +25,12 @@ interface CoinArea {
  * Scatters Coins over each area in proportion to its size: the expected count is
  * tiles × density, rounded up or down at random so small areas still get their share.
  */
-export function placeCoins(random: Random, areas: readonly CoinArea[], keepClear: readonly Tile[]): Coin[] {
+export function placeCoins(
+  random: Random,
+  weights: DenominationWeights,
+  areas: readonly CoinArea[],
+  keepClear: readonly Tile[],
+): Coin[] {
   const clear = new Set(keepClear.map(tileKey));
   const coins: Coin[] = [];
   for (const area of areas) {
@@ -29,14 +40,20 @@ export function placeCoins(random: Random, areas: readonly CoinArea[], keepClear
       const j = random.int(i, free.length - 1);
       [free[i], free[j]] = [free[j]!, free[i]!];
       const { x, y } = free[i]!;
-      coins.push({ id: coins.length, x, y, denomination: randomDenomination(random) });
+      coins.push({ id: coins.length, x, y, denomination: randomDenomination(random, weights) });
     }
   }
   return coins;
 }
 
-function randomDenomination(random: Random): Denomination {
-  const weights = COIN_TUNING.denominationWeights;
+/** The Denomination mix for a Level; Levels past the end of the tuning table use its last entry. */
+export function denominationWeights(levelNumber: number): DenominationWeights {
+  const table = COIN_TUNING.denominationWeightsByLevel;
+  const index = Math.min(Math.max(Math.floor(levelNumber), 1), table.length) - 1;
+  return table[index]!;
+}
+
+function randomDenomination(random: Random, weights: DenominationWeights): Denomination {
   let roll = random.next() * DENOMINATIONS.reduce((sum, d) => sum + weights[d], 0);
   for (const denomination of DENOMINATIONS) {
     roll -= weights[denomination];

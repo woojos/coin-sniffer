@@ -3,6 +3,8 @@ import { MINER_TUNING } from '../data/tuning';
 import { touchesCoin, type Coin } from './coins';
 import { areaAt, generateLevel, type Level } from './level';
 import { moveMiner, type Direction, type Miner } from './miner';
+import { createRandom } from './random';
+import { tileKey, type Tile } from './tile';
 
 export type { Corridor, Level, Rect, Room, RoomKind } from './level';
 export type { Tile } from './tile';
@@ -13,7 +15,7 @@ export type { Denomination } from '../data/tuning';
 export type RunStatus = 'playing' | 'paused' | 'over';
 
 export interface RunOptions {
-  /** Seed for Level generation, so a Run can be reproduced exactly. */
+  /** Seed for the first Level and for every Level after it, so a Run can be reproduced exactly. */
   seed: number;
 }
 
@@ -46,19 +48,24 @@ export interface Run {
   update(input: RunInput, elapsedMs: number): void;
 }
 
+/** Mixed into the Run's seed for the stream that seeds later Levels, so it differs from Level 1's own stream. */
+const LEVEL_SEED_SALT = 0x9e3779b9;
+
 /** Longest stretch the Miner moves between Coin checks, so fast frames cannot skip a Coin. */
 const COLLECTION_STEP = 0.1;
 
 export function createRun(options: RunOptions): Run {
-  const level = generateLevel(options.seed);
-  let miner: Miner = { x: level.startGate.x + 0.5, y: level.startGate.y + 0.5, facing: 'down' };
-  let coins: readonly Coin[] = level.coins;
+  const levelSeeds = createRandom(options.seed ^ LEVEL_SEED_SALT);
+  let levelNumber = 1;
+  let level!: Level;
+  let miner!: Miner;
+  let coins: readonly Coin[] = [];
   let score = 0;
-  const visitedRooms: number[] = [];
-  const visitedCorridors: number[] = [];
+  let visitedRooms: number[] = [];
+  let visitedCorridors: number[] = [];
 
   const visitMinerArea = (): void => {
-    const area = areaAt(level, { x: Math.floor(miner.x), y: Math.floor(miner.y) });
+    const area = areaAt(level, minerTile(miner));
     const visited = area?.kind === 'room' ? visitedRooms : visitedCorridors;
     if (area && !visited.includes(area.id)) visited.push(area.id);
   };
@@ -70,11 +77,26 @@ export function createRun(options: RunOptions): Run {
     coins = coins.filter((coin) => !touched.includes(coin));
   };
 
-  visitMinerArea();
+  /** A fresh Level replaces the old one entirely, so there is no way back. */
+  const enterLevel = (seed: number, facing: Direction): void => {
+    level = generateLevel(seed, levelNumber);
+    miner = { x: level.startGate.x + 0.5, y: level.startGate.y + 0.5, facing };
+    coins = level.coins;
+    visitedRooms = [];
+    visitedCorridors = [];
+    visitMinerArea();
+  };
+
+  const descend = (): void => {
+    levelNumber += 1;
+    enterLevel(levelSeeds.int(0, 2 ** 32 - 1), miner.facing);
+  };
+
+  enterLevel(options.seed, 'down');
 
   return {
     state: () => ({
-      levelNumber: 1,
+      levelNumber,
       score,
       status: 'playing',
       level,
@@ -91,7 +113,19 @@ export function createRun(options: RunOptions): Run {
         miner = moveMiner(level, miner, direction, distance / steps);
         collectTouchedCoins();
         visitMinerArea();
+        if (onTile(miner, level.endGate)) {
+          descend();
+          return;
+        }
       }
     },
   };
+}
+
+function minerTile(miner: Miner): Tile {
+  return { x: Math.floor(miner.x), y: Math.floor(miner.y) };
+}
+
+function onTile(miner: Miner, tile: Tile): boolean {
+  return tileKey(minerTile(miner)) === tileKey(tile);
 }

@@ -91,11 +91,11 @@ describe('Miner movement', () => {
     expect(run.state().miner.facing).toBe('up');
   });
 
-  it('can walk from the start Gate to the end Gate without lining up exactly', () => {
+  it('can walk from the start Gate through the end Gate without lining up exactly', () => {
     for (const seed of SEEDS) {
       const run = createRun({ seed });
       walkTo(run, run.state().level.endGate);
-      expect(minerTile(run)).toEqual(run.state().level.endGate);
+      expect(run.state().levelNumber).toBe(2);
     }
   });
 });

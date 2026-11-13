@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRun } from './run';
-import { walkTo } from './testing/walk';
+import { minerTile, route, walkTo } from './testing/walk';
 
 describe('visited areas', () => {
   it('start with only the start Room visited', () => {
@@ -25,7 +25,9 @@ describe('visited areas', () => {
   it('never marks an area visited before the Miner reaches it', () => {
     const run = createRun({ seed: 3 });
     const { level } = run.state();
-    walkTo(run, level.endGate);
+    // Stop one tile short of the end Gate, which would lead on to the next Level.
+    const path = route(level, minerTile(run), level.endGate);
+    walkTo(run, path[path.length - 2]!);
     const { visited } = run.state();
     const sideRooms = level.rooms.filter((r) => r.kind === 'side').map((r) => r.id);
     for (const id of sideRooms) expect(visited.rooms).not.toContain(id);

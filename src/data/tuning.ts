@@ -24,9 +24,20 @@ export const MINER_TUNING = {
 export const DENOMINATIONS = [1, 5, 10, 25, 100] as const;
 export type Denomination = (typeof DENOMINATIONS)[number];
 
+export type DenominationWeights = Readonly<Record<Denomination, number>>;
+
 export const COIN_TUNING = {
-  /** Relative chance of each Denomination. A single table for now; it varies by Level later. */
-  denominationWeights: { 1: 55, 5: 30, 10: 12, 25: 3, 100: 0 } satisfies Record<Denomination, number>,
+  /**
+   * Relative chance of each Denomination, by Level number: entry 0 is Level 1. Levels past the
+   * end of the table use its last entry. Face values never change; only the mix shifts upwards.
+   */
+  denominationWeightsByLevel: [
+    { 1: 55, 5: 30, 10: 12, 25: 3, 100: 0 },
+    { 1: 45, 5: 32, 10: 16, 25: 6, 100: 1 },
+    { 1: 35, 5: 32, 10: 20, 25: 10, 100: 3 },
+    { 1: 27, 5: 30, 10: 24, 25: 14, 100: 5 },
+    { 1: 20, 5: 27, 10: 26, 25: 18, 100: 9 },
+  ] satisfies readonly DenominationWeights[],
   /** Expected Coins per floor tile of a Main Path Room. */
   roomDensity: 0.04,
   /**
