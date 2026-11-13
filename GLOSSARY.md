@@ -16,6 +16,14 @@ _Avoid_: Map, stage, floor
 An open area within a Level where Coins lie and Monsters wait.
 _Avoid_: Chamber, cave
 
+**Main Path**:
+The route of Rooms from a Level's start Gate to its end Gate.
+_Avoid_: Critical path, track
+
+**Side Room**:
+An optional dead-end Room off the Main Path.
+_Avoid_: Branch, secret room
+
 **Corridor**:
 A walkable passage connecting Rooms within a Level.
 _Avoid_: Tunnel, hallway
