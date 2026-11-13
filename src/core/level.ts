@@ -8,12 +8,15 @@ export interface Tile {
 
 export type RoomKind = 'main' | 'side';
 
-export interface Room {
-  readonly id: number;
+export interface Rect {
   readonly x: number;
   readonly y: number;
   readonly width: number;
   readonly height: number;
+}
+
+export interface Room extends Rect {
+  readonly id: number;
   readonly kind: RoomKind;
 }
 
@@ -49,7 +52,7 @@ export function generateLevel(seed: number): Level {
   const random = createRandom(seed);
   for (let attempt = 0; attempt < MAX_LAYOUT_ATTEMPTS; attempt++) {
     const draft = tryLayout(random);
-    if (draft) return finish(seed, draft);
+    if (draft) return toLevel(seed, draft);
   }
   throw new Error(`Could not generate a Level for seed ${seed}`);
 }
@@ -58,11 +61,14 @@ export function roomContains(room: Rect, tile: Tile): boolean {
   return tile.x >= room.x && tile.x < room.x + room.width && tile.y >= room.y && tile.y < room.y + room.height;
 }
 
-interface Rect {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
+export type Area = { readonly kind: 'room'; readonly id: number } | { readonly kind: 'corridor'; readonly id: number };
+
+/** The Room or Corridor a floor tile belongs to, or null for a wall. */
+export function areaAt(level: Level, tile: Tile): Area | null {
+  const room = level.rooms.find((r) => roomContains(r, tile));
+  if (room) return { kind: 'room', id: room.id };
+  const corridor = level.corridors.find((c) => c.tiles.some((t) => t.x === tile.x && t.y === tile.y));
+  return corridor ? { kind: 'corridor', id: corridor.id } : null;
 }
 
 interface Proposal {
@@ -114,11 +120,11 @@ class Draft {
 }
 
 function tryLayout(random: Random): Draft | null {
-  const t = LEVEL_TUNING;
-  const roomCount = random.int(t.roomCount.min, t.roomCount.max);
+  const tuning = LEVEL_TUNING;
+  const roomCount = random.int(tuning.roomCount.min, tuning.roomCount.max);
   const sideCount = random.int(
-    t.sideRoomCount.min,
-    Math.min(t.sideRoomCount.max, roomCount - t.minMainPathRooms),
+    tuning.sideRoomCount.min,
+    Math.min(tuning.sideRoomCount.max, roomCount - tuning.minMainPathRooms),
   );
   const mainCount = roomCount - sideCount;
 
@@ -179,26 +185,27 @@ function propose(random: Random, parent: Rect): Proposal {
   const roomAcrossLen = horizontal ? size.height : size.width;
 
   const lane = random.int(parentAcross, parentAcross + parentAcrossLen - 1);
-  const exit = sign > 0 ? parentAlong + parentAlongLen : parentAlong - 1;
+  /** The first Corridor tile, just outside the parent Room's wall. */
+  const mouth = sign > 0 ? parentAlong + parentAlongLen : parentAlong - 1;
 
-  if (random.next() < 0.5) {
+  if (random.next() >= LEVEL_TUNING.bentCorridorChance) {
     const length = leg();
-    const corridor = Array.from({ length }, (_, i) => tile(exit + sign * i, lane));
-    const near = exit + sign * length;
+    const corridor = Array.from({ length }, (_, i) => tile(mouth + sign * i, lane));
+    const near = mouth + sign * length;
     const roomAlong = sign > 0 ? near : near - roomAlongLen + 1;
     const roomAcross = random.int(lane - roomAcrossLen + 1, lane);
     return { room: rect(roomAlong, roomAlongLen, roomAcross, roomAcrossLen), corridor };
   }
 
-  const run = leg();
-  const rise = leg();
+  const firstLeg = leg();
+  const secondLeg = leg();
   const turn = random.pick([1, -1] as const);
-  const corner = exit + sign * (run - 1);
+  const corner = mouth + sign * (firstLeg - 1);
   const corridor = [
-    ...Array.from({ length: run }, (_, i) => tile(exit + sign * i, lane)),
-    ...Array.from({ length: rise }, (_, j) => tile(corner, lane + turn * (j + 1))),
+    ...Array.from({ length: firstLeg }, (_, i) => tile(mouth + sign * i, lane)),
+    ...Array.from({ length: secondLeg }, (_, j) => tile(corner, lane + turn * (j + 1))),
   ];
-  const near = lane + turn * (rise + 1);
+  const near = lane + turn * (secondLeg + 1);
   const roomAcross = turn > 0 ? near : near - roomAcrossLen + 1;
   const roomAlong = random.int(corner - roomAlongLen + 1, corner);
   return { room: rect(roomAlong, roomAlongLen, roomAcross, roomAcrossLen), corridor };
@@ -213,7 +220,7 @@ function randomRoomSize(random: Random): { width: number; height: number } {
 }
 
 /** Shifts the draft so a one-tile wall border surrounds it, and places the Gates. */
-function finish(seed: number, draft: Draft): Level {
+function toLevel(seed: number, draft: Draft): Level {
   const tiles = [
     ...draft.rooms.flatMap((room) => rectTiles(room.rect)),
     ...draft.corridors.flatMap((corridor) => corridor.tiles),
@@ -233,7 +240,7 @@ function finish(seed: number, draft: Draft): Level {
 
   const startRoom = rooms[mainPath[0]!]!;
   const endRoom = rooms[mainPath[mainPath.length - 1]!]!;
-  const exitTile = corridors.find((c) => c.from === startRoom.id && c.to === mainPath[1])!.tiles[0]!;
+  const startMouth = corridors.find((c) => c.from === startRoom.id && c.to === mainPath[1])!.tiles[0]!;
   const entryCorridor = corridors.find((c) => c.to === endRoom.id)!;
   const entryTile = entryCorridor.tiles[entryCorridor.tiles.length - 1]!;
 
@@ -245,7 +252,7 @@ function finish(seed: number, draft: Draft): Level {
     rooms,
     corridors,
     mainPath,
-    startGate: farthestTile(startRoom, exitTile),
+    startGate: farthestTile(startRoom, startMouth),
     endGate: farthestTile(endRoom, entryTile),
   };
 }
@@ -263,7 +270,7 @@ function farthestTile(rect: Rect, from: Tile): Tile {
   return best;
 }
 
-function rectTiles(rect: Rect): Tile[] {
+export function rectTiles(rect: Rect): Tile[] {
   const tiles: Tile[] = [];
   for (let y = rect.y; y < rect.y + rect.height; y++) {
     for (let x = rect.x; x < rect.x + rect.width; x++) tiles.push({ x, y });

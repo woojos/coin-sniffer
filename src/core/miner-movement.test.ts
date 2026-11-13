@@ -11,12 +11,12 @@ const VECTOR = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] } as co
 function openDirection(run: Run): Direction {
   const level = run.state().level;
   const start = minerTile(run);
-  const runLength = (d: Direction) => {
+  const floorStretch = (d: Direction) => {
     let n = 0;
     while (isFloor(level, { x: start.x + VECTOR[d][0] * (n + 1), y: start.y + VECTOR[d][1] * (n + 1) })) n++;
     return n;
   };
-  return [...DIRECTIONS].sort((a, b) => runLength(b) - runLength(a))[0]!;
+  return [...DIRECTIONS].sort((a, b) => floorStretch(b) - floorStretch(a))[0]!;
 }
 
 function bodyOnFloor(level: Level, x: number, y: number): boolean {

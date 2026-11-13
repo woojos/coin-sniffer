@@ -1,10 +1,5 @@
 // Tuning values, kept apart from the rules that use them.
 
-export interface Range {
-  readonly min: number;
-  readonly max: number;
-}
-
 export const LEVEL_TUNING = {
   roomCount: { min: 4, max: 6 },
   sideRoomCount: { min: 1, max: 2 },
@@ -14,6 +9,8 @@ export const LEVEL_TUNING = {
   roomHeight: { min: 8, max: 12 },
   /** Length of each straight leg of a Corridor, in tiles. */
   corridorLeg: { min: 3, max: 7 },
+  /** Chance that a Corridor bends once (L-shaped) instead of running straight. */
+  bentCorridorChance: 0.5,
 } as const;
 
 export const MINER_TUNING = {

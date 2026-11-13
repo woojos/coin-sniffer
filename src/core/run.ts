@@ -1,9 +1,9 @@
 // Headless core: owns every rule of a Run and never imports Phaser.
 import { MINER_TUNING } from '../data/tuning';
-import { generateLevel, roomContains, type Level, type Tile } from './level';
+import { areaAt, generateLevel, type Level } from './level';
 import { moveMiner, type Direction, type Miner } from './miner';
 
-export type { Corridor, Level, Room, RoomKind, Tile } from './level';
+export type { Corridor, Level, Rect, Room, RoomKind, Tile } from './level';
 export type { Direction, Miner } from './miner';
 
 export type RunStatus = 'playing' | 'paused' | 'over';
@@ -47,11 +47,9 @@ export function createRun(options: RunOptions): Run {
   const visitedCorridors: number[] = [];
 
   const visitMinerArea = (): void => {
-    const tile = { x: Math.floor(miner.x), y: Math.floor(miner.y) };
-    const room = level.rooms.find((r) => roomContains(r, tile));
-    if (room && !visitedRooms.includes(room.id)) visitedRooms.push(room.id);
-    const corridor = level.corridors.find((c) => c.tiles.some((t) => sameTile(t, tile)));
-    if (corridor && !visitedCorridors.includes(corridor.id)) visitedCorridors.push(corridor.id);
+    const area = areaAt(level, { x: Math.floor(miner.x), y: Math.floor(miner.y) });
+    const visited = area?.kind === 'room' ? visitedRooms : visitedCorridors;
+    if (area && !visited.includes(area.id)) visited.push(area.id);
   };
   visitMinerArea();
 
@@ -71,5 +69,3 @@ export function createRun(options: RunOptions): Run {
     },
   };
 }
-
-const sameTile = (a: Tile, b: Tile): boolean => a.x === b.x && a.y === b.y;

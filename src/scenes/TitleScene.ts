@@ -16,7 +16,7 @@ export class TitleScene extends Scene {
       })
       .setOrigin(0.5);
 
-    // Full menu navigation comes in a later ticket; for now Enter or Space starts a Run.
+    // Full menu navigation comes in a later ticket; for now Enter starts a Run.
     this.add
       .text(width / 2, height / 2 + 40, '> Play', {
         fontFamily: 'monospace',
@@ -25,11 +25,8 @@ export class TitleScene extends Scene {
       })
       .setOrigin(0.5);
 
-    const keyboard = this.input.keyboard!;
-    const play = (): void => {
+    this.input.keyboard!.once('keydown-ENTER', () => {
       this.scene.start('Play');
-    };
-    keyboard.once('keydown-ENTER', play);
-    keyboard.once('keydown-SPACE', play);
+    });
   }
 }

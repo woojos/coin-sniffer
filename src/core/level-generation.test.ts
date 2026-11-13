@@ -36,7 +36,8 @@ describe('Level generation', () => {
   });
 
   it('produces different Levels for different seeds', () => {
-    expect(levelFor(1)).not.toEqual(levelFor(2));
+    const layouts = new Set(SEEDS.map((seed) => JSON.stringify({ ...levelFor(seed), seed: undefined })));
+    expect(layouts.size).toBe(SEEDS.length);
   });
 
   it('has 4 to 6 Rooms, 1 or 2 of them Side Rooms', () => {
