@@ -57,6 +57,8 @@ export const COIN_TUNING = {
 
 export const MONSTER_TUNING = {
   crawler: {
+    /** Life at spawn; Swings take it away and the Crawler is removed at zero. */
+    life: 30,
     /** Tiles per second; slower than the Miner so he can always get away. */
     speed: 2,
     /** Width and height of the Crawler's body, in tiles. */
@@ -74,4 +76,29 @@ export const MONSTER_TUNING = {
   sideRoomRichness: 2,
   /** Most Monsters a single Room ever holds. */
   maxPerRoom: 5,
+  /** How long a Monster flashes after a Swing hits it. */
+  hitFlashMs: 150,
 } as const;
+
+/** Everything that describes a Weapon, so new ones can be added as data alone. */
+export interface Weapon {
+  /** Life taken from each Monster a Swing hits. */
+  readonly attackStrength: number;
+  /** Shortest time from the start of one Swing to the start of the next. */
+  readonly cooldownMs: number;
+  /** Time from pressing Swing to the hit landing. */
+  readonly swingTimeMs: number;
+  /** How far from the Miner's centre the arc reaches, in tiles. */
+  readonly reach: number;
+  /** Full angle of the arc, centred on the facing direction, in degrees. */
+  readonly arcWidthDegrees: number;
+}
+
+/** The Weapon every Miner starts with. */
+export const SWORD: Weapon = {
+  attackStrength: 10,
+  cooldownMs: 400,
+  swingTimeMs: 120,
+  reach: 1.5,
+  arcWidthDegrees: 120,
+};

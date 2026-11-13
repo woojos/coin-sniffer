@@ -16,6 +16,10 @@ export interface Monster {
   readonly y: number;
   /** True while the Monster is chasing the Miner; false while it idles. */
   readonly awake: boolean;
+  /** Remaining Life; the Monster is removed when it reaches zero. */
+  readonly life: number;
+  /** Time left flashing after a Swing hit it; 0 when not flashing. */
+  readonly flashMs: number;
 }
 
 /**
@@ -39,7 +43,16 @@ export function placeMonsters(
       const j = random.int(i, free.length - 1);
       [free[i], free[j]] = [free[j]!, free[i]!];
       const { x, y } = free[i]!;
-      monsters.push({ id: monsters.length, kind: 'crawler', room: room.id, x: x + 0.5, y: y + 0.5, awake: false });
+      monsters.push({
+        id: monsters.length,
+        kind: 'crawler',
+        room: room.id,
+        x: x + 0.5,
+        y: y + 0.5,
+        awake: false,
+        life: MONSTER_TUNING.crawler.life,
+        flashMs: 0,
+      });
     }
   }
   return monsters;
@@ -52,6 +65,7 @@ export function placeMonsters(
  */
 export function updateMonster(monster: Monster, room: Room, miner: Miner, elapsedMs: number): Monster {
   const tuning = MONSTER_TUNING[monster.kind];
+  if (monster.flashMs > 0) monster = { ...monster, flashMs: Math.max(0, monster.flashMs - elapsedMs) };
   const dx = miner.x - monster.x;
   const dy = miner.y - monster.y;
   const gap = Math.hypot(dx, dy);
@@ -77,4 +91,9 @@ function clamp(value: number, min: number, max: number): number {
 export function touchesMiner(monster: Monster, miner: Miner): boolean {
   const reach = (MONSTER_TUNING[monster.kind].size + MINER_TUNING.size) / 2;
   return Math.abs(miner.x - monster.x) < reach && Math.abs(miner.y - monster.y) < reach;
+}
+
+/** Takes `damage` from the Monster's Life and makes it flash. */
+export function hitMonster(monster: Monster, damage: number): Monster {
+  return { ...monster, life: Math.max(0, monster.life - damage), flashMs: MONSTER_TUNING.hitFlashMs };
 }

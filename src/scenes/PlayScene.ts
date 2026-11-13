@@ -7,10 +7,13 @@ import {
   type Level,
   type Monster,
   type Run,
+  type SwingState,
   type Tile,
   type VisitedAreas,
+  type Weapon,
 } from '../core/run';
 import { tileKey } from '../core/tile';
+import { FACING_ANGLE, halfArc } from '../core/swing';
 import { MINER_TUNING, MONSTER_TUNING } from '../data/tuning';
 
 const TILE_PX = 32;
@@ -24,6 +27,8 @@ const COLOURS = {
   startGate: 0x4caf50,
   endGate: 0xf2c14e,
   crawler: 0xc0392b,
+  monsterHit: 0xffffff,
+  swing: 0xe8e8e8,
   lifeBar: 0xd64545,
   lifeBarBack: 0x3a1010,
   hud: '#f2c14e',
@@ -65,9 +70,13 @@ export class PlayScene extends Scene {
   private run!: Run;
   /** Held direction keys in the order they were pressed; the last one wins. */
   private heldKeys: string[] = [];
+  private swingHeld = false;
+  /** Set on every fresh Swing key press and cleared after the next update, so a tap shorter than a frame still counts. */
+  private swingTapped = false;
   private levelGraphics!: GameObjects.Graphics;
   private coinGraphics!: GameObjects.Graphics;
   private monsterGraphics!: GameObjects.Graphics;
+  private swingGraphics!: GameObjects.Graphics;
   private lifeBar!: GameObjects.Graphics;
   private hudText!: GameObjects.Text;
   /** Floor tiles of visited areas, by tile key. */
@@ -87,6 +96,8 @@ export class PlayScene extends Scene {
     console.info(`Run seed: ${seed}`);
     this.run = createRun({ seed });
     this.heldKeys = [];
+    this.swingHeld = false;
+    this.swingTapped = false;
     this.drawnLevel = null;
     this.drawnVisitKey = '';
     this.drawnCoinKey = '';
@@ -95,6 +106,7 @@ export class PlayScene extends Scene {
     this.levelGraphics = this.add.graphics();
     this.coinGraphics = this.add.graphics();
     this.monsterGraphics = this.add.graphics();
+    this.swingGraphics = this.add.graphics();
     const minerPx = MINER_TUNING.size * TILE_PX;
     this.miner = this.add.rectangle(0, 0, minerPx, minerPx, COLOURS.miner);
     this.facingMarker = this.add.rectangle(0, 0, minerPx / 4, minerPx / 4, COLOURS.facing);
@@ -117,7 +129,9 @@ export class PlayScene extends Scene {
 
   override update(_time: number, delta: number): void {
     const lastKey = this.heldKeys[this.heldKeys.length - 1];
-    this.run.update({ direction: lastKey ? (KEY_DIRECTIONS[lastKey] ?? null) : null }, delta);
+    const direction = lastKey ? (KEY_DIRECTIONS[lastKey] ?? null) : null;
+    this.run.update({ direction, swing: this.swingHeld || this.swingTapped }, delta);
+    this.swingTapped = false;
     this.render();
     const { status, score, levelNumber } = this.run.state();
     if (status === 'over') this.scene.start('RunOver', { score, levelNumber });
@@ -125,17 +139,23 @@ export class PlayScene extends Scene {
 
   private wireDirectionKeys(): void {
     const keyboard = this.input.keyboard!;
-    keyboard.addCapture('W,A,S,D,UP,DOWN,LEFT,RIGHT');
+    keyboard.addCapture('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE');
     const onDown = (event: KeyboardEvent): void => {
+      if (event.code === 'Space' && !event.repeat) {
+        this.swingHeld = true;
+        this.swingTapped = true;
+      }
       if (!(event.code in KEY_DIRECTIONS) || event.repeat) return;
       this.heldKeys = [...this.heldKeys.filter((code) => code !== event.code), event.code];
     };
     const onUp = (event: KeyboardEvent): void => {
+      if (event.code === 'Space') this.swingHeld = false;
       this.heldKeys = this.heldKeys.filter((code) => code !== event.code);
     };
     // Key-up events are lost while the window is unfocused, so forget held keys then.
     const onBlur = (): void => {
       this.heldKeys = [];
+      this.swingHeld = false;
     };
     keyboard.on('keydown', onDown);
     keyboard.on('keyup', onUp);
@@ -148,7 +168,8 @@ export class PlayScene extends Scene {
   }
 
   private render(): void {
-    const { level, levelNumber, miner, life, invulnerableMs, visited, coins, monsters, score } = this.run.state();
+    const { level, levelNumber, miner, life, invulnerableMs, weapon, swing, visited, coins, monsters, score } =
+      this.run.state();
     if (level !== this.drawnLevel) {
       this.cameras.main.setBounds(0, 0, level.width * TILE_PX, level.height * TILE_PX);
       this.drawnLevel = level;
@@ -177,6 +198,18 @@ export class PlayScene extends Scene {
     const hidden = invulnerableMs > 0 && Math.floor(invulnerableMs / FLASH_MS) % 2 === 1;
     this.miner.setVisible(!hidden);
     this.facingMarker.setVisible(!hidden);
+    this.drawSwing(swing, weapon);
+  }
+
+  /** Sweeps the Swing's arc in front of the Miner, filling in as the hit approaches. */
+  private drawSwing(swing: SwingState | null, weapon: Weapon): void {
+    const g = this.swingGraphics.clear();
+    if (swing === null) return;
+    const half = halfArc(weapon);
+    const start = FACING_ANGLE[swing.facing] - half;
+    g.fillStyle(COLOURS.swing, 0.25 + 0.35 * swing.progress)
+      .slice(this.miner.x, this.miner.y, weapon.reach * TILE_PX, start, start + 2 * half * swing.progress)
+      .fillPath();
   }
 
   /** Draws Monsters in visited areas only; Monsters in the dark stay hidden. */
@@ -187,7 +220,7 @@ export class PlayScene extends Scene {
       if (!this.lit.has(tileKey({ x: Math.floor(monster.x), y: Math.floor(monster.y) }))) continue;
       const cx = monster.x * TILE_PX;
       const cy = monster.y * TILE_PX;
-      g.fillStyle(COLOURS.crawler).fillCircle(cx, cy, size / 2);
+      g.fillStyle(monster.flashMs > 0 ? COLOURS.monsterHit : COLOURS.crawler).fillCircle(cx, cy, size / 2);
       g.lineStyle(2, 0x000000, 0.6).strokeCircle(cx, cy, size / 2);
     }
   }
